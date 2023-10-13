@@ -6,8 +6,6 @@ from sklearn.preprocessing import Normalizer
 from pyod.models.ecod import ECOD
 from sentence_transformers import SentenceTransformer
 
-import logging
-
 
 class KMeansPreprocessor(BaseEstimator, TransformerMixin):
     INDEX_COLS = ['school_id', 'year']
@@ -50,23 +48,29 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
     def __init__(self, index_cols=None, num_cols=None, remainder_cols=None, high_school=False, **kwargs):
         # Set defaults if no information was provided
         if index_cols is None:
-            index_cols = self.INDEX_COLS
+            self.index_cols = self.INDEX_COLS
+        else:
+            self.index_cols = index_cols
 
         if num_cols is None:
             if not high_school:
-                num_cols = self.NUM_COLS
+                self.num_cols = self.NUM_COLS
             else:
-                num_cols = self.NUM_COLS + self.HIGH_NUM_COLS
+                self.num_cols = self.NUM_COLS + self.HIGH_NUM_COLS
+        else:
+            self.num_cols = num_cols
 
         if remainder_cols is None:
             if not high_school:
-                remainder_cols = self.INDEX_COLS + self.CAT_COLS
+                self.remainder_cols = self.INDEX_COLS + self.CAT_COLS
             else:
-                remainder_cols = self.INDEX_COLS + self.CAT_COLS + self.HIGH_CAT_COLS
+                self.remainder_cols = self.INDEX_COLS + self.CAT_COLS + self.HIGH_CAT_COLS
+        else:
+            self.remainder_cols = index_cols + remainder_cols
 
         na_filler = FillBackForward()
-        feature_builder = KMeansFeatureBuilder(num_cols=num_cols, remainder_cols=remainder_cols)
-        outlier_remover = OutlierRemover(index_cols=index_cols)
+        feature_builder = KMeansFeatureBuilder(num_cols=self.num_cols, remainder_cols=self.remainder_cols)
+        outlier_remover = OutlierRemover(index_cols=self.index_cols)
 
         steps = [('NA_filler', na_filler),
                  ('feature_builder', feature_builder),
@@ -80,7 +84,7 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X = self.pipeline.transform(X)
-        return pd.DataFrame(X, columns=self.pipeline[:-1].get_feature_names_out())
+        return pd.DataFrame(X, columns=(self.remainder_cols + self.num_cols))
 
 
 class KMeansFeatureBuilder(BaseEstimator, TransformerMixin):
@@ -153,7 +157,7 @@ class FillBackForward(BaseEstimator, TransformerMixin):
 
 class OutlierRemover(BaseEstimator, TransformerMixin):
     """ Removes Outliers using the ECOD class not including the index columns. """
-    def __init__(self, index_cols=None):
+    def __init__(self, index_cols=None, **kwargs):
         # Automatically assume that there are two index columns if none are provided
         if index_cols is None:
             self.end_index_cols = 2

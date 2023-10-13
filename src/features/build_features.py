@@ -1,13 +1,13 @@
 import pandas as pd
 from pathlib import Path
-from preprocessors import KMeansPreprocessor
+from src.features.preprocessors import KMeansPreprocessor
 from src.input_output_functions import append_path
 
 
 def main(input_filepath, output_filepath):
     all_interim_df, high_interim_df = load_interim_data(input_filepath)
 
-    build_kmeans(output_filepath, all_interim_df.head(), high_interim_df.head())
+    build_kmeans(output_filepath, all_interim_df, high_interim_df)
 
 
 def load_interim_data(input_filepath):
