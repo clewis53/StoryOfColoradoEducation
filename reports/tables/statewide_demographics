@@ -1,0 +1,13 @@
+\begin{tabular}{lr}
+\toprule
+{} &  Statewide Percentage \\
+\midrule
+American Indian  &              0.008598 \\
+Asian            &              0.030238 \\
+Black            &              0.049605 \\
+Hispanic         &              0.312047 \\
+White            &              0.568823 \\
+Pacific Islander &              0.002154 \\
+Two Or More      &              0.028535 \\
+\bottomrule
+\end{tabular}

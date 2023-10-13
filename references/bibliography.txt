@@ -1,0 +1,5 @@
+Wilson, R. (2013, January). Visualize the State of Public Education in Colorado, Version 1. Retrieved February 13, 2023 from https://www.kaggle.com/competitions/visualize-the-state-of-education-in-colorado/overview/description
+
+Colorado Department of Education. (2022, August). School District Revenues and Expenditures, Version 1. Retreived February 13, 2023 from http://www.cde.state.co.us/cdefinance/revexp
+
+Census.gov. (2021, October). SAIPE State and County Estimates, Version 1. Retreived February 13, 2023 fro

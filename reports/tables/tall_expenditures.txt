@@ -1,0 +1,11 @@
+\begin{tabular}{lllrrrrrrrrrrr}
+\toprule
+{} &       district\_name & county &  instruction\_total &  support\_total &  community\_total &  other\_total &  sum\_total &  instruction\_per\_pupil &  support\_per\_pupil &  community\_per\_pupil &  other\_per\_pupil &  sum\_per\_pupil &  year \\
+\midrule
+0 &          MAPLETON 1 &  ADAMS &           39962942 &       23760636 &           237704 &      5474579 &   69435862 &                   5556 &               3303 &                   33 &              761 &           9653 &  2010 \\
+1 &  ADAMS 12 FIVE STAR &  ADAMS &          220263102 &      130356958 &           943009 &     83867989 &  435431057 &                   5482 &               3244 &                   23 &             2087 &          10837 &  2010 \\
+2 &     ADAMS COUNTY 14 &  ADAMS &           34792431 &       34598159 &           703485 &      7862015 &   77956091 &                   4956 &               4928 &                  100 &             1120 &          11104 &  2010 \\
+3 &        BRIGHTON 27J &  ADAMS &           62557927 &       50921503 &           219987 &     18440305 &  132139723 &                   4397 &               3579 &                   15 &             1296 &           9287 &  2010 \\
+4 &         BENNETT 29J &  ADAMS &            4853879 &        3540284 &                0 &      1004359 &    9398521 &                   4537 &               3309 &                    0 &              939 &           8784 &  2010 \\
+\bottomrule
+\end{tabular}
