@@ -1,7 +1,9 @@
-StoryOfColoradoEducation
+Story Of ColoradoEducation
 ==============================
 
 Springboard Data Science Career Track Capstone 2
+
+Uses data analysis, visualization, and unsupervised learning for the Colorado Board of Education to best help its students. 
 
 Project Organization
 ------------
