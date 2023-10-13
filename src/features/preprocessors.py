@@ -6,6 +6,8 @@ from sklearn.preprocessing import Normalizer
 from pyod.models.ecod import ECOD
 from sentence_transformers import SentenceTransformer
 
+import logging
+
 
 class KMeansPreprocessor(BaseEstimator, TransformerMixin):
     INDEX_COLS = ['school_id', 'year']
@@ -46,6 +48,7 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
                      'graduation_rate']
 
     def __init__(self, index_cols=None, num_cols=None, remainder_cols=None, high_school=False, **kwargs):
+        # Set defaults if no information was provided
         if index_cols is None:
             index_cols = self.INDEX_COLS
 
@@ -73,9 +76,11 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         self.pipeline.fit(X)
+        return self
 
     def transform(self, X):
-        return self.pipeline.transform(X)
+        X = self.pipeline.transform(X)
+        return pd.DataFrame(X, columns=self.pipeline[:-1].get_feature_names_out())
 
 
 class KMeansFeatureBuilder(BaseEstimator, TransformerMixin):
@@ -83,18 +88,19 @@ class KMeansFeatureBuilder(BaseEstimator, TransformerMixin):
 
     def __init__(self, num_cols=None, remainder_cols=None):
         num = Pipeline(steps=[('encoder', Normalizer())])
-        remainder = Pipeline(steps=[('encoder', PassthroughTransformer())])
+        passthrough = Pipeline(steps=[('encoder', PassthroughTransformer())])
         transformer = ColumnTransformer(transformers=[
-            ('num', num, num_cols),
-            ('', remainder, remainder_cols)],
+            ('', passthrough, remainder_cols),
+            ('num', num, num_cols)],
             verbose_feature_names_out=self.VERBOSE_FEATURE_NAMES_OUT)
         self.pipeline = Pipeline(steps=[('transformer', transformer)])
 
     def fit(self, X, y=None):
-        self.transformer.fit(X)
+        self.pipeline.fit(X)
+        return self
 
     def transform(self, X):
-        return self.transformer.transform(X)
+        return self.pipeline.transform(X)
 
 
 class PassthroughTransformer(BaseEstimator, TransformerMixin):
@@ -113,8 +119,11 @@ class FillBackForward(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
+        # Remove any entries where the school id is not known
         X = X[X['school_id'].notna()]
+        # Filling backwards and forwards
         X = self.fill_back_forward(X)
+        # Fill remaining NA Values with median
         X = self.fill_median_by_year(X)
 
         return X
@@ -143,8 +152,9 @@ class FillBackForward(BaseEstimator, TransformerMixin):
 
 
 class OutlierRemover(BaseEstimator, TransformerMixin):
-
-    def __init__(self, index_cols=None, **kwargs):
+    """ Removes Outliers using the ECOD class not including the index columns. """
+    def __init__(self, index_cols=None):
+        # Automatically assume that there are two index columns if none are provided
         if index_cols is None:
             self.end_index_cols = 2
         else:
