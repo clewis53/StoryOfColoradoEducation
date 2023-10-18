@@ -1,8 +1,10 @@
 import lightgbm as lgb
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
 import pandas as pd
+import plotly.express as px
+import plotly.offline as pyo
+import prince
 import seaborn as sns
 import shap
 from sklearn.cluster import KMeans
@@ -12,6 +14,7 @@ from yellowbrick.cluster import KElbowVisualizer
 from src.input_output_functions import append_path
 
 sns.set_theme(style='darkgrid', palette='husl')
+pyo.init_notebook_mode()
 
 RANDOM_STATE = 42
 
@@ -59,7 +62,7 @@ class KMeansSelector:
             self.make_silhouette_plot(k)
 
     def make_silhouette_plot(self, n_clusters):
-        """ Makes a silhoutte plot for the specified number of clusters """
+        """ Makes a silhouette plot for the specified number of clusters """
         model = self.create_model(n_clusters)
         labels = model.fit_predict(self.X)
 
@@ -80,6 +83,7 @@ class KMeansSelector:
         plt.yticks([])
         # Initialize y_lower for plotting cluster silhouettes
         y_lower = 10
+        colors = sns.husl_palette(n_clusters)
         for i in range(n_clusters):
             # Find silhouette scores for ith cluster and sort
             cluster_sil_values = sample_sil_values[labels == i]
@@ -87,7 +91,8 @@ class KMeansSelector:
             # Plot silhouette
             size = cluster_sil_values.shape[0]
             y_upper = y_lower + size  # Set the top of the silhouette
-            color = cm.nipy_spectral(i / n_clusters)  # Create a color for the silhouette
+            sns.husl_palette()
+            color = colors[i]  # Create a color for the silhouette
             plt.fill_betweenx(
                 np.arange(y_lower, y_upper),
                 0,
@@ -133,9 +138,74 @@ class KMeansModel:
         if data_no_outliers is None:
             data_no_outliers = self.X
 
-        lgbm = lgb.LGBMClassifier(colsample_bytree=0.8 )
+        lgbm = lgb.LGBMClassifier(colsample_bytree=0.8, verbose=-1)
         lgbm.fit(X=data_no_outliers, y=self.labels)
 
         explainer = shap.TreeExplainer(lgbm)
         shap_vals = explainer.shap_values(data_no_outliers)
         shap.summary_plot(shap_vals, data_no_outliers, plot_type='bar', plot_size=(15, 10))
+
+    def _get_pca(self, n_dim):
+        pca = prince.PCA(
+            n_components=n_dim,
+            n_iter=3,
+            rescale_with_mean=True,
+            rescale_with_std=True,
+            copy=True,
+            check_input=True,
+            engine='sklearn',
+            random_state=RANDOM_STATE
+        )
+        pca.fit(self.X)
+        df = pca.transform(self.X)
+        df.columns = [f'comp{i}' for i in range(n_dim)]
+
+        return pca, df
+
+    def plot_2d(self):
+        pca, df_2d = self._get_pca(2)
+
+        explained_var = pca.eigenvalues_summary
+        print(f'Explained Variance for Model {explained_var}')
+        sns.scatterplot(data=df_2d, x='comp0', y='comp1', hue=self.labels)
+        plt.show()
+
+    def plot_3d(self):
+        pca, df_3d = self._get_pca(3)
+
+        explained_var = pca.eigenvalues_summary
+        print(f'Explained Variance for Model {explained_var}')
+
+        fig = px.scatter_3d(
+            df_3d,
+            x='comp0',
+            y='comp1',
+            z='comp2',
+            color=self.labels,
+            template='plotly',
+            title='PCA 3D',
+            color_discrete_sequence=px.colors.qualitative.Vivid
+        ).update_traces(
+            # mode = 'markers',
+            marker={
+                "size": 2,
+                "opacity": 0.6,
+                # "symbol" : "diamond",
+                "line": {
+                    "width": 0.1,
+                    "color": "black",
+                }
+            }
+        ).update_layout(
+            width=800,
+            height=800,
+            autosize=True,
+            showlegend=True,
+            legend=dict(title_font_family="Times New Roman",
+                        font=dict(size=20)),
+            scene=dict(xaxis=dict(title='comp1', titlefont_color='black'),
+                       yaxis=dict(title='comp2', titlefont_color='black'),
+                       zaxis=dict(title='comp3', titlefont_color='black')),
+            font=dict(family="Gilroy", color='black', size=15))
+
+        fig.show()

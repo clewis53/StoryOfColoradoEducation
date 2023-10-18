@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 
 
 class KMeansPreprocessor(BaseEstimator, TransformerMixin):
-    INDEX_COLS = ['school_id', 'year']
+    INDEX_COLS = ['unique_id', 'year']
 
     CAT_COLS = ['achievement_dir',
                 'growth_dir',
@@ -110,7 +110,7 @@ class PassthroughTransformer(BaseEstimator, TransformerMixin):
 
 
 class FillBackForward(BaseEstimator, TransformerMixin):
-
+    id_cols = []
     def fit(self, X, y=None):
         return self
 
@@ -128,7 +128,7 @@ class FillBackForward(BaseEstimator, TransformerMixin):
     def fill_back_forward(X):
         """ Fills NA values for each school with values from the most recent year first.
         Then fills NA values from the previous year."""
-        ids = X['school_id'].unique()
+        ids = X[['school_id', 'emh']].unique()
         for i in ids:
             X.loc[X['school_id'] == i] = X.loc[X['school_id'] == i].sort_values(by='year').bfill()
             X.loc[X['school_id'] == i] = X.loc[X['school_id'] == i].sort_values(by='year').ffill()

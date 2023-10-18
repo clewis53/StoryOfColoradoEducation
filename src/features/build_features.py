@@ -9,7 +9,7 @@ def main(input_filepath, output_filepath):
 
     build_kmeans(output_filepath, all_interim_df, high_interim_df)
 
-    build_llm_kmeans(output_filepath, all_interim_df, high_interim_df)
+    # build_llm_kmeans(output_filepath, all_interim_df, high_interim_df)
 
 def load_interim_data(input_filepath):
     """ Loads the interim data located at the input_filepath.

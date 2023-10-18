@@ -77,6 +77,9 @@ class IDDatasetBuilder:
         
         # Remove duplicates
         self.id_dataset = self.id_dataset.drop_duplicates(subset=self.id_cols)
+
+        # Remove NA
+        self.id_dataset = self.id_dataset.dropna(subset=self.id_cols)
         
                  
     def save(self, filepath):
@@ -95,9 +98,16 @@ class IDDatasetBuilder:
     
 class SchoolIDBuilder(IDDatasetBuilder):
     # The columns that make the schools dataset
-    keep_cols = ['school_id', 'school', 'district_id']
+    keep_cols = ['school_id', 'emh', 'school', 'district_id']
     # The id column for the school id dataset
-    id_cols = ['school_id']
+    id_cols = ['school_id', 'emh']
+
+    def build(self):
+        super().build()
+        self._create_unique_id()
+
+    def _create_unique_id(self):
+        self.id_dataset['unique_id'] = self.id_dataset['school_id'].astype('int').astype('string') + self.id_dataset['emh']
     
 
 class DistrictIDBuilder(IDDatasetBuilder):

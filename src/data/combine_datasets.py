@@ -74,12 +74,11 @@ def create_all_data(input_filepath, output_filepath,
     change_final_df = pd.merge(change, final, on=['school_id', 'district_id', 'emh', 'year'], how='outer')
     
     all_data = pd.merge(census_exp_df, change_final_df, on=['district_id', 'year'], how='outer')
-    all_data = pd.merge(all_data, enroll.drop('district_id', axis=1), on=['school_id','year'], how='outer')
+    all_data = pd.merge(all_data, enroll.drop('district_id', axis=1), on=['school_id', 'year'], how='outer')
     all_data = pd.merge(all_data, frl.drop('district_id', axis=1), on=['school_id', 'year'], how='outer')
     all_data = pd.merge(all_data, district, on='district_id')
-    all_data = pd.merge(all_data, school, on=['school_id', 'district_id'])
-    
-    
+    all_data = pd.merge(all_data, school, on=['school_id', 'emh', 'district_id'], how='outer')
+
     all_data.drop('graduation_rate', axis=1).to_csv(append_path(output_filepath, 'all_data.csv'), index=False)
     
     return all_data
@@ -89,8 +88,7 @@ def create_high_school(input_filepath, output_filepath,
                        all_data):
     coact_remediation = pd.merge(coact, remediation, on=['school_id', 'year'])
     all_data_high_schools = all_data[all_data['emh'] == 'H'].drop('emh', axis=1)
-    
-    
+
     high_school = pd.merge(coact_remediation, all_data_high_schools, on=['school_id', 'district_id', 'year'])
     
     high_school.to_csv(append_path(output_filepath, 'high_school.csv'), index=False)
