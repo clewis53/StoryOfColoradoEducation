@@ -9,11 +9,12 @@ import prince
 import seaborn as sns
 import shap
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_samples, silhouette_score, calinski_harabasz_score, davies_bouldin_score
+from sklearn.metrics import silhouette_samples, silhouette_score, calinski_harabasz_score, davies_bouldin_score, adjusted_rand_score
 from sklearn.preprocessing import Normalizer
 from yellowbrick.cluster import KElbowVisualizer
 
 from src.features.preprocessors import KMeansPreprocessor
+from src.input_output_functions import append_path
 
 sns.set_theme(style='darkgrid', palette='husl')
 pyo.init_notebook_mode()
@@ -141,19 +142,31 @@ class KPrototypesModelSelector:
         plt.show()
 
 
-
 class KMeansModel:
     """ Class that will create KMeans model and provide evaluations of that model. """
 
     def __init__(self, df, n_clusters):
+        # The index columns
         self.index = df[['unique_id', 'year']]
+        # The feature columns
         self.X = df.drop(['unique_id', 'year'], axis=1)
+        # The model that will be used
         self.model = KMeans(n_clusters, random_state=RANDOM_STATE, max_iter=100, n_init='auto')
+        # Initialize the labels assigned
         self.labels = []
 
     def fit_predict(self):
         """ Fits and predicts the model """
         self.labels = self.model.fit_predict(self.X)
+
+    def save_model(self, output_filepath, filename, data_no_outliers=None):
+        """ Saves a dataframe composed of the input features and assigned cluster labels. """
+        if data_no_outliers is None:
+            data_no_outliers = pd.concat((self.index, self.X), axis=1)
+
+        labels = pd.Series(self.labels, name='cluster_labels')
+        df = pd.concat((data_no_outliers, labels), axis=1)
+        df.to_csv(append_path(output_filepath, filename), index=False)
 
     def evaluate_model(self):
         """ Shows Davies Bouldin Index (close to zero represents a good model)
@@ -169,17 +182,25 @@ class KMeansModel:
     def show_feature_importance(self, data_no_outliers=None):
         """ Uses a gradient boosting decision tree from LightGBM to classify labels,
         and then shows the feature importance using the shap Tree explainer """
+        # If not no outlier dataset is provided, the data used for the clustering model will be used
         if data_no_outliers is None:
             data_no_outliers = self.X
 
+        # Using LGBM classify clusters
         lgbm = lgb.LGBMClassifier(colsample_bytree=0.8, verbose=-1)
         lgbm.fit(X=data_no_outliers, y=self.labels)
 
+        # Create an Explainer
         explainer = shap.TreeExplainer(lgbm)
         shap_vals = explainer.shap_values(data_no_outliers)
-        shap.summary_plot(shap_vals, data_no_outliers, plot_type='bar', plot_size=(15, 10))
+
+        # Display the Explainer
+        shap.summary_plot(shap_vals, data_no_outliers, plot_type='bar', plot_size=(15, 10), show=False)
+        plt.title('SHAP Summary Plot of LGBM Cluster Classification')
+        plt.show()
 
     def _get_pca(self, n_dim):
+        """ Get the PCA decomposition for the provided number of components """
         pca = prince.PCA(
             n_components=n_dim,
             n_iter=3,
@@ -196,19 +217,41 @@ class KMeansModel:
 
         return pca, df
 
-    def plot_2d(self):
+    def plot_2d(self, save_filename=None):
+        """ Plot the dataframe in a 2 dimensional space """
+        # Break down the dataframe to two principal components
         pca, df_2d = self._get_pca(2)
 
+        # Display the explained variance for those principal components
         explained_var = pca.eigenvalues_summary
         print(f'Explained Variance for Model {explained_var}')
+        var_percents = pca.percentage_of_variance_
+
+        # Make a plot of the dataframe colored by cluster
         sns.scatterplot(data=df_2d, x='comp0', y='comp1', hue=self.labels)
+        plt.title('PCA 2D Plot')
+        plt.xlabel(f'Comp 1 -- {var_percents[0]/100:.2%}')
+        plt.ylabel(f'Comp 2 -- {var_percents[1]/100:.2%}')
+
+        if save_filename is not None:
+            plt.savefig(save_filename)
+
         plt.show()
 
-    def plot_3d(self, size=2):
+    def plot_3d(self, high_school=False):
+        """ Plot the dataframe in a 3 dimensional space """
+        # Break down the dataframe into 3D space
         pca, df_3d = self._get_pca(3)
 
+        # Display the explained variance
         explained_var = pca.eigenvalues_summary
         print(f'Explained Variance for Model {explained_var}')
+
+        # Make the plot
+        if high_school:
+            size, opacity = 5, 0.9
+        else:
+            size, opacity = 2, 0.75
 
         fig = px.scatter_3d(
             df_3d,
@@ -223,7 +266,7 @@ class KMeansModel:
             # mode = 'markers',
             marker={
                 "size": size,
-                # "opacity": 0.6,
+                "opacity": opacity,
                 "line": {
                     "width": 0.1,
                     "color": "black",
@@ -262,3 +305,18 @@ class KPrototypesModel(KMeansModel):
         # Normalize the numeric columns
         normalizer = Normalizer()
         self.X[self.num_cols] = normalizer.fit_transform(self.X[self.num_cols])
+
+
+def show_adj_rand_score_mat(models, model_names):
+    """ Calculates the adjusted rand score between each models labels and returns it as a pandas DataFrame """
+    if len(models) != len(model_names):
+        raise ValueError(f"""The number of models provided was {len(models)}\n
+        while the number of names was {len(model_names)}. 
+        These must be the same""")
+
+    mat = np.eye(len(models))
+    for i in range(len(models)):
+        for j in range(i):
+            mat[i, j] = adjusted_rand_score(models[i].labels, models[j].labels)
+
+    return pd.DataFrame(mat, columns=model_names, index=model_names)

@@ -31,6 +31,7 @@ def get_no_outliers(original_df, processed_df, preprocessor):
 
     return na_filler.fit_transform(no_outliers)
 
+
 def process_data(df, preprocessor, output_filepath, filename):
     """ Processes data and saves it along with the original data that has been updated to not include outliers """
     processed_df = preprocessor.fit_transform(df)
