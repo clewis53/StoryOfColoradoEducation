@@ -33,9 +33,9 @@ def make_datasets(input_filepath, output_filepath):
                      append_path(output_filepath, 'kaggle'))
     
     # Combine datasets
-    # combined_datasets = combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
+    combined_datasets = combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
     
-    # return census, exp, kaggle, combined_datasets
+    return census, exp, kaggle, combined_datasets
 
 
 def make_census(input_filepath, output_filepath, years=(2010, 2011, 2012)):

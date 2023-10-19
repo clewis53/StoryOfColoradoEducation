@@ -12,7 +12,7 @@ import src.data.builders as builders
 
 def combine_datasets(input_filepath, output_filepath, census, exp, kaggle):
     # Extract kaggle datasets
-    change, coact, enroll, final, frl, remediation, address = kaggle
+    change, coact, enroll, final, frl, remediation, address, gps = kaggle
     
     # Build district dataset
     district = create_district_dataset(input_filepath, output_filepath,
@@ -40,7 +40,6 @@ def combine_datasets(input_filepath, output_filepath, census, exp, kaggle):
     high_school = create_high_school(input_filepath, output_filepath, coact, remediation, all_data)
     
     # Build the GPS location dataset
-    gps = pd.DataFrame()
     create_gps_location(input_filepath, output_filepath, gps, school)
     
     return district, school, all_data, high_school
@@ -100,7 +99,11 @@ def create_high_school(input_filepath, output_filepath,
 
 
 def create_gps_location(input_filepath, output_filepath, gps, school):
-    pass
+    combined_gps = pd.merge(gps, school[['school_id', 'unique_id']], on=['school_id'])
+    combined_gps.to_csv(append_path(output_filepath, 'unique_gps.csv'), index=False)
+
+    return combined_gps
+
 
 def find_district_id(district, census, exp):
     def _find_district_id(df):
