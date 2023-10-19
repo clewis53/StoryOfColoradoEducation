@@ -1,3 +1,4 @@
+from kmodes.kprototypes import KPrototypes
 import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
@@ -209,3 +210,11 @@ class KMeansModel:
             font=dict(family="Gilroy", color='black', size=15))
 
         fig.show()
+
+
+class KPrototypesModel(KMeansModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.model = KPrototypesModel(**kwargs)

@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from src.features.preprocessors import KMeansPreprocessor, LLMKMeansPreprocessor
+from src.features.preprocessors import KMeansPreprocessor, LLMKMeansPreprocessor, FillBackForward
 from src.input_output_functions import append_path
 
 
@@ -9,7 +9,8 @@ def main(input_filepath, output_filepath):
 
     build_kmeans(output_filepath, all_interim_df, high_interim_df)
 
-    # build_llm_kmeans(output_filepath, all_interim_df, high_interim_df)
+    build_llm_kmeans(output_filepath, all_interim_df, high_interim_df)
+
 
 def load_interim_data(input_filepath):
     """ Loads the interim data located at the input_filepath.
@@ -18,6 +19,29 @@ def load_interim_data(input_filepath):
     high_school = pd.read_csv(append_path(input_filepath, 'high_school.csv'))
 
     return all_data, high_school
+
+
+def get_no_outliers(original_df, processed_df, preprocessor):
+    """ Merges the original and processed data frames"""
+    # Identify the columns that were selected after processing
+    correct_cols = original_df[preprocessor.all_cols]
+
+    no_outliers = pd.merge(processed_df[preprocessor.index_cols], correct_cols, on=preprocessor.index_cols, how='left')
+    na_filler = FillBackForward()
+
+    return na_filler.fit_transform(no_outliers)
+
+def process_data(df, preprocessor, output_filepath, filename):
+    """ Processes data and saves it along with the original data that has been updated to not include outliers """
+    processed_df = preprocessor.fit_transform(df)
+    no_outliers = get_no_outliers(df, processed_df, preprocessor)
+
+    processed_df.to_csv(append_path(output_filepath, filename))
+    no_outliers.to_csv(append_path(output_filepath, 'no_outliers_' + filename), index=False)
+
+    print('finished processing')
+
+    return processed_df
 
 
 def build_kmeans(output_filepath, all_data=None, high_school=None, input_filepath=None):
@@ -34,13 +58,11 @@ def build_kmeans(output_filepath, all_data=None, high_school=None, input_filepat
 
     # Processed the all_data and saves it
     preprocessor = KMeansPreprocessor()
-    processed_all = preprocessor.fit_transform(all_data)
-    processed_all.to_csv(append_path(output_filepath, 'kmeans_all_data.csv'), index=False)
+    processed_all = process_data(all_data, preprocessor, output_filepath, 'kmeans_all_data.csv')
 
     # Processes the high_school data and saves it
     preprocessor = KMeansPreprocessor(high_school=True)
-    processed_high = preprocessor.fit_transform(high_school)
-    processed_high.to_csv(append_path(output_filepath, 'kmeans_high_school.csv'), index=False)
+    processed_high = process_data(high_school, preprocessor, output_filepath, 'kmeans_high_school.csv')
 
     # Returns the processed dataframes
     return processed_all, processed_high
@@ -61,13 +83,11 @@ def build_llm_kmeans(output_filepath, all_data=None, high_school=None, input_fil
 
     # Processed the all_data and saves it
     preprocessor = LLMKMeansPreprocessor()
-    processed_all = preprocessor.fit_transform(all_data)
-    processed_all.to_csv(append_path(output_filepath, 'llc_kmeans_all_data.csv'), index=False)
+    processed_all = process_data(all_data, preprocessor, output_filepath, 'llm_kmeans_all_data.csv')
 
     # Processes the high_school data and saves it
     preprocessor = LLMKMeansPreprocessor(high_school=True)
-    processed_high = preprocessor.fit_transform(high_school)
-    processed_high.to_csv(append_path(output_filepath, 'llc_kmeans_high_school.csv'), index=False)
+    processed_high = process_data(high_school, preprocessor, output_filepath, 'llm_kmeans_high_school.csv')
 
     # Returns the processed dataframes
     return processed_all, processed_high

@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
@@ -61,6 +62,8 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
         else:
             self.remainder_cols = index_cols + remainder_cols
 
+        self.all_cols = self.remainder_cols + self.num_cols
+
         na_filler = FillBackForward()
         feature_builder = KMeansFeatureBuilder(num_cols=self.num_cols, remainder_cols=self.remainder_cols)
         outlier_remover = OutlierRemover(index_cols=self.index_cols)
@@ -116,7 +119,7 @@ class FillBackForward(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         # Remove any entries where the school id is not known
-        X = X[X['school_id'].notna()]
+        X = X[X['unique_id'].notna()]
         # Filling backwards and forwards
         X = self.fill_back_forward(X)
         # Fill remaining NA Values with median
@@ -128,10 +131,10 @@ class FillBackForward(BaseEstimator, TransformerMixin):
     def fill_back_forward(X):
         """ Fills NA values for each school with values from the most recent year first.
         Then fills NA values from the previous year."""
-        ids = X[['school_id', 'emh']].unique()
+        ids = X['unique_id'].unique()
         for i in ids:
-            X.loc[X['school_id'] == i] = X.loc[X['school_id'] == i].sort_values(by='year').bfill()
-            X.loc[X['school_id'] == i] = X.loc[X['school_id'] == i].sort_values(by='year').ffill()
+            X.loc[X['unique_id'] == i] = X.loc[X['unique_id'] == i].sort_values(by='year').bfill()
+            X.loc[X['unique_id'] == i] = X.loc[X['unique_id'] == i].sort_values(by='year').ffill()
 
         return X
 
@@ -140,9 +143,13 @@ class FillBackForward(BaseEstimator, TransformerMixin):
         """ Fills NA values with the median of each year."""
         years = X['year'].unique()
         num_cols = X.select_dtypes(include=('float', 'int')).columns
+        str_cols = X.select_dtypes(include=('object')).columns
         for year in years:
-            medians = X.loc[X['year'] == year, num_cols].median()
+            medians = X.loc[X['year'] == year, num_cols].median(numeric_only=True)
+            modes = X.loc[X['year'] == year, str_cols].mode()
+
             X.loc[X['year'] == year, num_cols] = X.loc[X['year'] == year, num_cols].fillna(medians)
+            X.loc[X['year'] == year, str_cols] = X.loc[X['year'] == year, str_cols].fillna(modes)
 
         return X
 
@@ -160,9 +167,10 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
+        data = np.array(X[:, self.end_index_cols:].tolist())
         clf = ECOD()
-        clf.fit(X[:, self.end_index_cols:])
-        outliers = clf.predict(X[:, self.end_index_cols:])
+        clf.fit(data)
+        outliers = clf.predict(data)
 
         X = X[outliers == 0]
 
@@ -170,7 +178,7 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
 
 
 class LLMKMeansPreprocessor(BaseEstimator, TransformerMixin):
-    INDEX_COLS = ['school_id', 'year']
+    INDEX_COLS = ['unique_id', 'year']
 
     COLS = ['achievement_dir',
             'growth_dir',
@@ -212,6 +220,8 @@ class LLMKMeansPreprocessor(BaseEstimator, TransformerMixin):
                 cols = self.COLS + self.HIGH_COLS
         else:
             cols = cols
+
+        self.all_cols = self.index_cols + cols
 
         na_filler = FillBackForward()
         feature_builder = LLMKMeansFeatureBuilder(index_cols=self.index_cols, cols=cols)
