@@ -29,13 +29,13 @@ def make_datasets(input_filepath, output_filepath):
                       append_path(output_filepath, 'census'))
     exp = make_expenditures(append_path(input_filepath, 'expenditures'), 
                             append_path(output_filepath, 'expenditures'))
-    kaggle = make_kaggle(append_path(input_filepath,'kaggle'), 
-                     append_path(output_filepath,'kaggle'))
+    kaggle = make_kaggle(append_path(input_filepath, 'kaggle'),
+                     append_path(output_filepath, 'kaggle'))
     
     # Combine datasets
-    combined_datasets = combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
+    # combined_datasets = combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
     
-    return census, exp, kaggle, combined_datasets
+    # return census, exp, kaggle, combined_datasets
 
 
 def make_census(input_filepath, output_filepath, years=(2010, 2011, 2012)):
@@ -100,9 +100,6 @@ def make_expenditures(input_filepath, output_filepath, years=(2010, 2011, 2012))
     tall_filepath = append_path(output_filepath, 'tall_expenditures.csv')
     return datasets.make_tall(id_col=years, filepath=tall_filepath)
     
-    
-
-
 
 def make_kaggle(input_filepath, output_filepath, years=(2010, 2011, 2012)):
     """
@@ -128,8 +125,10 @@ def make_kaggle(input_filepath, output_filepath, years=(2010, 2011, 2012)):
     frl = make_k_12_frl(input_filepath, output_filepath)
     remediation = make_remediation(input_filepath, output_filepath)
     address = make_school_address(input_filepath, output_filepath)
+    gps = make_gps(input_filepath, output_filepath)
     
-    return change, coact, enroll, final, frl, remediation, address
+    return change, coact, enroll, final, frl, remediation, address, gps
+
 
 def make_1yr_3yr_change(input_filepath, output_filepath, years=(2010, 2011, 2012)):
     """
@@ -224,6 +223,14 @@ def make_school_address(input_filepath, output_filepath, years=(2010, 2011, 2012
     return datasets.make_tall(id_col=years, filepath=tall_filepath)
     
 
+def make_gps(input_filepath, output_filepath):
+    input_filenames = [append_path(input_filepath, 'school_gps_coordinates.csv')]
+    output_filenames = [append_path(output_filepath, 'school_gps_coordinates.csv')]
+
+    datasets = DataFrameSet(input_filenames, output_filenames, makers.GPSMaker)
+    datasets.make_dataframes()
+
+    return datasets.dataframes[0]
 
 def main(input_filepath, output_filepath):
     make_datasets(input_filepath, output_filepath)
