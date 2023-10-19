@@ -5,10 +5,10 @@ Created on Thu Feb 16 13:02:25 2023
 @author: caeley
 """
 from pathlib import Path
-from makers import DataFrameSet
-import makers
-from combine_datasets import combine_datasets
-from input_output_functions import append_path, create_filenames
+from src.data.makers import DataFrameSet
+import src.data.makers as makers
+from src.data.combine_datasets import combine_datasets
+from src.input_output_functions import append_path, create_filenames
 
 
 def make_datasets(input_filepath, output_filepath):
@@ -36,54 +36,6 @@ def make_datasets(input_filepath, output_filepath):
     combined_datasets = combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
     
     return census, exp, kaggle, combined_datasets
-    
-    
-    
-
-
-
-# def make_tall(datasets, id_col=[], id_name='df_id'):
-#     """
-#     Transforms a list of .csv datasets into a single tall .csv dataset
-
-#     Parameters
-#     ----------
-#     datasets : list(DataFrame)
-#         A non-empty list of DataFrames to combine.
-#     id_col: list(int), optional
-#         A list of values that should identify each dataframe before concatenating them.
-#         The default is [] or don't add id_col.
-#     id_name: String, optional
-#         The name for the id column to be used when id_cols is not empty.
-#         The default is 'df_id'.
-
-#     Returns
-#     -------
-#     tall_df: DataFrame
-#         The dataframe of the tall version of the given datasets
-
-#     """
-#     # Initialize DataFrame
-#     tall_df = datasets[0]   
-#     # Make changes if id_col have been added
-#     if id_col:
-#         # The length of id_col must be equal to the number of datasets provided
-#         assert len(id_col) == len(datasets)
-#         # Their must be an id_name given when an id_col is specified
-#         assert id_name != None
-#         # Add the id column
-#         tall_df[id_name] = id_col[0]
-    
-#     # Iterate over all datasets and id_col
-#     for i in range(1, len(datasets)):
-#         # Add the id column if necessary
-#         if id_col:
-#             datasets[i][id_name] = id_col[i]
-
-#         tall_df = pd.concat((tall_df, datasets[i]))
-        
-#     return tall_df
-
 
 
 def make_census(input_filepath, output_filepath, years=(2010, 2011, 2012)):

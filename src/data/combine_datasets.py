@@ -4,10 +4,10 @@ Created on Mon Jul 10 18:35:03 2023
 
 @author: caeley
 """
-from input_output_functions import append_path
+from src.input_output_functions import append_path
 import pandas as pd
 from pathlib import Path
-import builders
+import src.data.builders as builders
 
 def combine_datasets(input_filepath, output_filepath, census, exp, kaggle):
     # Extract kaggle datasets
@@ -38,7 +38,9 @@ def combine_datasets(input_filepath, output_filepath, census, exp, kaggle):
     # Build high school data
     high_school = create_high_school(input_filepath, output_filepath, coact, remediation, all_data)
     
-    
+    # Build the GPS location dataset
+    gps = pd.DataFrame()
+    create_gps_location(input_filepath, output_filepath, gps, school)
     
     return district, school, all_data, high_school
     
@@ -95,6 +97,9 @@ def create_high_school(input_filepath, output_filepath,
     
     return high_school
 
+
+def create_gps_location(input_filepath, output_filepath, gps, school):
+    pass
 
 def find_district_id(district, census, exp):
     def _find_district_id(df):
