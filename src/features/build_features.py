@@ -36,7 +36,7 @@ def process_data(df, preprocessor, output_filepath, filename):
     processed_df = preprocessor.fit_transform(df)
     no_outliers = get_no_outliers(df, processed_df, preprocessor)
 
-    processed_df.to_csv(append_path(output_filepath, filename))
+    processed_df.to_csv(append_path(output_filepath, filename), index=False)
     no_outliers.to_csv(append_path(output_filepath, 'no_outliers_' + filename), index=False)
 
     print('finished processing')

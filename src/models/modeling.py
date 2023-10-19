@@ -10,9 +10,10 @@ import seaborn as sns
 import shap
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples, silhouette_score, calinski_harabasz_score, davies_bouldin_score
+from sklearn.preprocessing import Normalizer
 from yellowbrick.cluster import KElbowVisualizer
 
-from src.input_output_functions import append_path
+from src.features.preprocessors import KMeansPreprocessor
 
 sns.set_theme(style='darkgrid', palette='husl')
 pyo.init_notebook_mode()
@@ -27,9 +28,9 @@ class KMeansSelector:
 
     def __init__(self, df):
         # The features
-        self.X = df.drop(['school_id', 'year'], axis=1)
+        self.X = df.drop(['unique_id', 'year'], axis=1)
         # the index part of the dataframe
-        self.index = df[['school_id', 'year']]
+        self.index = df[['unique_id', 'year']]
 
     @staticmethod
     def create_model(n_clusters=8):
@@ -109,12 +110,44 @@ class KMeansSelector:
         plt.show()
 
 
+class KPrototypesModelSelector:
+    def __init__(self, df):
+        # The features
+        self.X = df.drop(['unique_id', 'year'], axis=1)
+        # the index part of the dataframe
+        self.index = df[['unique_id', 'year']]
+
+    @staticmethod
+    def create_model(n_clusters=8):
+        """ Returns a KMeans model """
+        return KPrototypes(n_clusters=n_clusters, random_state=RANDOM_STATE)
+
+    def show_elbow(self):
+        """ Utilizes the KElbowVisualizer from yellowbrick to create an elbow plot
+        of distortion scores and model fit time across a range of k values and identifies
+         the optimal k"""
+        # Ensure that school_id and year are not found in the dataframe
+        costs = np.zeros(8-2)
+        ks = np.arange(2, 8)
+        for i in range(len(ks)):
+            model = self.create_model(ks[i])
+            model.fit_predict(self.X, categorical=[0,1,2,3])
+            costs[i] = model.cost_
+
+        plt.plot(ks, costs, linestyle='--', marker='o')
+        plt.title('KPrototypes Elbow')
+        plt.xlabel('K')
+        plt.ylabel('Cost')
+        plt.show()
+
+
+
 class KMeansModel:
     """ Class that will create KMeans model and provide evaluations of that model. """
 
     def __init__(self, df, n_clusters):
-        self.index = df[['school_id', 'year']]
-        self.X = df.drop(['school_id', 'year'], axis=1)
+        self.index = df[['unique_id', 'year']]
+        self.X = df.drop(['unique_id', 'year'], axis=1)
         self.model = KMeans(n_clusters, random_state=RANDOM_STATE, max_iter=100, n_init='auto')
         self.labels = []
 
@@ -171,7 +204,7 @@ class KMeansModel:
         sns.scatterplot(data=df_2d, x='comp0', y='comp1', hue=self.labels)
         plt.show()
 
-    def plot_3d(self):
+    def plot_3d(self, size=2):
         pca, df_3d = self._get_pca(3)
 
         explained_var = pca.eigenvalues_summary
@@ -189,9 +222,8 @@ class KMeansModel:
         ).update_traces(
             # mode = 'markers',
             marker={
-                "size": 2,
-                "opacity": 0.6,
-                # "symbol" : "diamond",
+                "size": size,
+                # "opacity": 0.6,
                 "line": {
                     "width": 0.1,
                     "color": "black",
@@ -202,19 +234,31 @@ class KMeansModel:
             height=800,
             autosize=True,
             showlegend=True,
-            legend=dict(title_font_family="Times New Roman",
-                        font=dict(size=20)),
-            scene=dict(xaxis=dict(title='comp1', titlefont_color='black'),
-                       yaxis=dict(title='comp2', titlefont_color='black'),
-                       zaxis=dict(title='comp3', titlefont_color='black')),
-            font=dict(family="Gilroy", color='black', size=15))
+        )
 
         fig.show()
 
 
 class KPrototypesModel(KMeansModel):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, df, n_clusters, high_school=False, **kwargs):
+        super().__init__(df, n_clusters)
 
-        self.model = KPrototypesModel(**kwargs)
+        if high_school:
+            self.cat_cols = KMeansPreprocessor.CAT_COLS + KMeansPreprocessor.HIGH_CAT_COLS
+            self.num_cols = KMeansPreprocessor.NUM_COLS + KMeansPreprocessor.HIGH_NUM_COLS
+        else:
+            self.cat_cols = KMeansPreprocessor.CAT_COLS
+            self.num_cols = KMeansPreprocessor.NUM_COLS
+
+        self.transform_df()
+        self.model = KPrototypes(n_clusters=n_clusters, random_state=RANDOM_STATE)
+
+    def fit_predict(self):
+        cat_indices = [self.X.columns.get_loc(col) for col in self.cat_cols]
+        self.labels = self.model.fit_predict(self.X, categorical=cat_indices)
+
+    def transform_df(self):
+        # Normalize the numeric columns
+        normalizer = Normalizer()
+        self.X[self.num_cols] = normalizer.fit_transform(self.X[self.num_cols])
