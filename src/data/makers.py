@@ -447,4 +447,5 @@ class AddressMaker(KaggleMaker):
 
 class GPSMaker(Maker):
     drop_cols = ['school name']
-    col_map = {'school number': 'school_id'}
+    col_map = {'school number': 'school_id',
+               'lattitude': 'latitude'}

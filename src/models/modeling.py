@@ -164,7 +164,7 @@ class KMeansModel:
         if data_no_outliers is None:
             data_no_outliers = pd.concat((self.index, self.X), axis=1)
 
-        labels = pd.Series(self.labels, name='cluster_labels')
+        labels = pd.Series(self.labels, name='cluster_label')
         df = pd.concat((data_no_outliers, labels), axis=1)
         df.to_csv(append_path(output_filepath, filename), index=False)
 

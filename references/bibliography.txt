@@ -3,3 +3,5 @@ Wilson, R. (2013, January). Visualize the State of Public Education in Colorado,
 Colorado Department of Education. (2022, August). School District Revenues and Expenditures, Version 1. Retreived February 13, 2023 from http://www.cde.state.co.us/cdefinance/revexp
 
 Census.gov. (2021, October). SAIPE State and County Estimates, Version 1. Retreived February 13, 2023 fro
+
+https://towardsdatascience.com/mastering-customer-segmentation-with-llm-3d9008235f41

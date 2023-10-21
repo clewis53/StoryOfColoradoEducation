@@ -99,7 +99,7 @@ def create_high_school(input_filepath, output_filepath,
 
 
 def create_gps_location(input_filepath, output_filepath, gps, school):
-    combined_gps = pd.merge(gps, school[['school_id', 'unique_id']], on=['school_id'])
+    combined_gps = pd.merge(gps, school, on=['school_id'])
     combined_gps.to_csv(append_path(output_filepath, 'unique_gps.csv'), index=False)
 
     return combined_gps
