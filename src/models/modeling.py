@@ -1,3 +1,4 @@
+from gower import gower_matrix
 from kmodes.kprototypes import KPrototypes
 import lightgbm as lgb
 import matplotlib.pyplot as plt
@@ -64,18 +65,26 @@ class KMeansSelector:
             print(f'{k=}')
             self.make_silhouette_plot(k)
 
-    def make_silhouette_plot(self, n_clusters):
-        """ Makes a silhouette plot for the specified number of clusters """
+    def get_silhouette_scores(self, n_clusters):
+        """ Returns the silhouette score and sample silhouette scores for the specified number of clusters. """
         model = self.create_model(n_clusters)
         labels = model.fit_predict(self.X)
 
         # Find the average Silhouette Score
         sil_avg = silhouette_score(self.X, labels)
-        print(f'For {n_clusters=}',
-              f'The average silhouette score is {sil_avg}')
 
         # Find Silhouette Scores for each sample and plot them
         sample_sil_values = silhouette_samples(self.X, labels)
+
+        return sil_avg, sample_sil_values, labels
+
+    def make_silhouette_plot(self, n_clusters):
+        """ Makes a silhouette plot for the specified number of clusters """
+        sil_avg, sample_sil_values, labels = self.get_silhouette_scores(n_clusters)
+
+        print(f'For {n_clusters=}',
+              f'The average silhouette score is {sil_avg}')
+
         # Initialize plot
         plt.title(f'Silhouette Plot For {n_clusters=}')
         plt.xlabel('Silhouette Coefficient Values')
@@ -111,12 +120,19 @@ class KMeansSelector:
         plt.show()
 
 
-class KPrototypesModelSelector:
-    def __init__(self, df):
+class KPrototypesModelSelector(KMeansSelector):
+    def __init__(self, df, high_school=False):
+        if high_school:
+            cat_cols = KMeansPreprocessor.CAT_COLS + KMeansPreprocessor.HIGH_CAT_COLS
+        else:
+            cat_cols = KMeansPreprocessor.CAT_COLS
+
         # The features
         self.X = df.drop(['unique_id', 'year'], axis=1)
         # the index part of the dataframe
         self.index = df[['unique_id', 'year']]
+        # The location of the categorical columns
+        self.cat_indices = [self.X.columns.get_loc(col) for col in cat_cols]
 
     @staticmethod
     def create_model(n_clusters=8):
@@ -132,7 +148,7 @@ class KPrototypesModelSelector:
         ks = np.arange(2, 8)
         for i in range(len(ks)):
             model = self.create_model(ks[i])
-            model.fit_predict(self.X, categorical=[0,1,2,3])
+            model.fit_predict(self.X, categorical=self.cat_indices)
             costs[i] = model.cost_
 
         plt.plot(ks, costs, linestyle='--', marker='o')
@@ -140,6 +156,20 @@ class KPrototypesModelSelector:
         plt.xlabel('K')
         plt.ylabel('Cost')
         plt.show()
+
+    def get_silhouette_scores(self, n_clusters):
+        """ Returns the silhouette score and sample silhouette scores for the specified number of clusters. """
+        model = self.create_model(n_clusters)
+        labels = model.fit_predict(self.X, categorical=self.cat_indices)
+
+        distance_mat = gower_matrix(self.X)
+        # Find the average Silhouette Score
+        sil_avg = silhouette_score(distance_mat, labels, metric='precomputed')
+
+        # Find Silhouette Scores for each sample and plot them
+        sample_sil_values = silhouette_samples(distance_mat, labels, metric='precomputed')
+
+        return sil_avg, sample_sil_values, labels
 
 
 class KMeansModel:

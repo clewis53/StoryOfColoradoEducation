@@ -11,33 +11,41 @@ from sentence_transformers import SentenceTransformer
 class KMeansPreprocessor(BaseEstimator, TransformerMixin):
     INDEX_COLS = ['unique_id', 'year']
 
-    CAT_COLS = ['achievement_dir',
-                'growth_dir',
-                'overall_dir',
-                'school_grade']
+    CAT_COLS = [
+        'achievement_dir',
+        'growth_dir',
+        'overall_dir',
+        'school_grade'
+    ]
 
-    NUM_COLS = ['est_total_pop',
-                'child_pov_ratio',
-                'child_adult_ratio',
-                'instruction_per_pupil',
-                'support_per_pupil',
-                'community_per_pupil',
-                'other_per_pupil',
-                'pct_amind',
-                'pct_asian',
-                'pct_black',
-                'pct_hisp',
-                'pct_white',
-                'pct_2ormore',
-                'pct_fr', ]
+    NUM_COLS = [
+        'est_total_pop',
+        'child_pov_ratio',
+        'child_adult_ratio',
+        'instruction_per_pupil',
+        'support_per_pupil',
+        'community_per_pupil',
+        'other_per_pupil',
+        'pct_amind',
+        'pct_asian',
+        'pct_black',
+        'pct_hisp',
+        'pct_white',
+        'pct_2ormore',
+        'pct_fr',
+    ]
 
-    HIGH_CAT_COLS = ['eng_yn',
-                     'math_yn',
-                     'read_yn',
-                     'sci_yn']
+    HIGH_CAT_COLS = [
+        'eng_yn',
+        'math_yn',
+        'read_yn',
+        'sci_yn'
+    ]
 
-    HIGH_NUM_COLS = ['pct_remediation',
-                     'graduation_rate']
+    HIGH_NUM_COLS = [
+        'pct_remediation',
+        'graduation_rate'
+    ]
 
     def __init__(self, index_cols=None, num_cols=None, remainder_cols=None, high_school=False, **kwargs):
         # Set defaults if no information was provided
@@ -68,9 +76,11 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
         feature_builder = KMeansFeatureBuilder(num_cols=self.num_cols, remainder_cols=self.remainder_cols)
         outlier_remover = OutlierRemover(index_cols=self.index_cols)
 
-        steps = [('NA_filler', na_filler),
-                 ('feature_builder', feature_builder),
-                 ('outlier_remover', outlier_remover)]
+        steps = [
+            ('NA_filler', na_filler),
+            ('feature_builder', feature_builder),
+            ('outlier_remover', outlier_remover)
+        ]
 
         self.pipeline = Pipeline(steps=steps)
 
@@ -114,6 +124,7 @@ class PassthroughTransformer(BaseEstimator, TransformerMixin):
 
 class FillBackForward(BaseEstimator, TransformerMixin):
     id_cols = []
+
     def fit(self, X, y=None):
         return self
 
@@ -156,6 +167,7 @@ class FillBackForward(BaseEstimator, TransformerMixin):
 
 class OutlierRemover(BaseEstimator, TransformerMixin):
     """ Removes Outliers using the ECOD class not including the index columns. """
+
     def __init__(self, index_cols=None, **kwargs):
         # Automatically assume that there are two index columns if none are provided
         if index_cols is None:
@@ -180,31 +192,35 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
 class LLMKMeansPreprocessor(BaseEstimator, TransformerMixin):
     INDEX_COLS = ['unique_id', 'year']
 
-    COLS = ['achievement_dir',
-            'growth_dir',
-            'overall_dir',
-            'school_grade',
-            'est_total_pop',
-            'child_pov_ratio',
-            'child_adult_ratio',
-            'instruction_per_pupil',
-            'support_per_pupil',
-            'community_per_pupil',
-            'other_per_pupil',
-            'pct_amind',
-            'pct_asian',
-            'pct_black',
-            'pct_hisp',
-            'pct_white',
-            'pct_2ormore',
-            'pct_fr']
+    COLS = [
+        'achievement_dir',
+        'growth_dir',
+        'overall_dir',
+        'school_grade',
+        'est_total_pop',
+        'child_pov_ratio',
+        'child_adult_ratio',
+        'instruction_per_pupil',
+        'support_per_pupil',
+        'community_per_pupil',
+        'other_per_pupil',
+        'pct_amind',
+        'pct_asian',
+        'pct_black',
+        'pct_hisp',
+        'pct_white',
+        'pct_2ormore',
+        'pct_fr'
+    ]
 
-    HIGH_COLS = ['eng_yn',
-                 'math_yn',
-                 'read_yn',
-                 'sci_yn',
-                 'pct_remediation',
-                 'graduation_rate']
+    HIGH_COLS = [
+        'eng_yn',
+        'math_yn',
+        'read_yn',
+        'sci_yn',
+        'pct_remediation',
+        'graduation_rate'
+    ]
 
     def __init__(self, index_cols=None, cols=None, high_school=False, **kwargs):
         # Set defaults if no information was provided
