@@ -73,7 +73,9 @@ def create_all_data(input_filepath, output_filepath,
                     change, enroll, final, frl,
                     district, school):
     census_exp_df = pd.merge(census, exp, on=['district_id', 'year'], how='outer')
-    change_final_df = pd.merge(change, final, on=['school_id', 'district_id', 'emh', 'year'], how='outer')
+    change_final_df = pd.merge(change, final,
+                               on=['school_id', 'district_id', 'emh', 'year', 'emh_combined'],
+                               how='outer')
     
     all_data = pd.merge(census_exp_df, change_final_df, on=['district_id', 'year'], how='outer')
     all_data = pd.merge(all_data, enroll.drop('district_id', axis=1), on=['school_id', 'year'], how='outer')
@@ -139,10 +141,10 @@ def main(input_filepath, output_filepath):
     frl = pd.read_csv(append_path(input_filepath, 'kaggle/FRL_tall.csv'))
     remediation = pd.read_csv(append_path(input_filepath, 'kaggle/remediation_tall.csv'))
     address = pd.DataFrame()
+    gps = pd.read_csv(append_path(input_filepath, 'kaggle/school_gps_coordinates.csv'))
     
-    kaggle = change, coact, enroll, final, frl, remediation, address
+    kaggle = change, coact, enroll, final, frl, remediation, address, gps
 
-    
     combine_datasets(input_filepath, output_filepath, census, exp, kaggle)
 
 
