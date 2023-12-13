@@ -3,85 +3,106 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import Normalizer, OneHotEncoder
 from pyod.models.ecod import ECOD
 from sentence_transformers import SentenceTransformer
 
+INDEX_COLS = ['unique_id', 'year']
+
+ORD = [
+    'achievement_dir',
+    'growth_dir',
+    'overall_dir',
+    'school_grade',
+    'overall_weighted_growth'
+    # 'read_achievement',
+    # 'math_achievement',
+    # 'write_achievement',
+    # 'science_achievement',
+    # 'read_growth',
+    # 'math_growth',
+    # 'write_growth',
+
+]
+
+ONE_HOT = [
+    # 'emh',
+    'emh_combined'
+]
+
+CAT_COLS = ORD + ONE_HOT
+
+NUM_COLS = [
+    'total',
+    # 'est_total_pop',
+    'child_pov_ratio',
+    'child_adult_ratio',
+    'instruction_per_pupil',
+    'support_per_pupil',
+    'community_per_pupil',
+    'other_per_pupil',
+    'pct_amind',
+    'pct_asian',
+    'pct_black',
+    'pct_hisp',
+    'pct_white',
+    'pct_2ormore',
+    'pct_fr',
+]
+
+HIGH_ORD = [
+    'eng_yn',
+    'math_yn',
+    'read_yn',
+    'sci_yn'
+]
+
+HIGH_ONE_HOT = [
+    'emh_combined'
+]
+
+HIGH_CAT_COLS = HIGH_ORD + HIGH_ONE_HOT
+
+HIGH_NUM_COLS = [
+    'pct_remediation',
+    'graduation_rate'
+]
+
 
 class KMeansPreprocessor(BaseEstimator, TransformerMixin):
-    INDEX_COLS = ['unique_id', 'year']
 
-    CAT_COLS = [
-        'achievement_dir',
-        'growth_dir',
-        'overall_dir',
-        'school_grade'
-    ]
+    def __init__(self, high_school=False, **kwargs):
+        # Set Params
+        self.high_school = high_school
+        self.index_cols = INDEX_COLS
+        self.remainder_cols = INDEX_COLS + ORD
+        self.one_hot_cols = ONE_HOT
+        self.num_cols = NUM_COLS
+        # Adjust params if high_school
+        if high_school:
+            self.remainder_cols = self.remainder_cols + HIGH_ORD
+            self.one_hot_cols = HIGH_ONE_HOT
+            self.num_cols = self.num_cols + HIGH_NUM_COLS
 
-    NUM_COLS = [
-        'est_total_pop',
-        'child_pov_ratio',
-        'child_adult_ratio',
-        'instruction_per_pupil',
-        'support_per_pupil',
-        'community_per_pupil',
-        'other_per_pupil',
-        'pct_amind',
-        'pct_asian',
-        'pct_black',
-        'pct_hisp',
-        'pct_white',
-        'pct_2ormore',
-        'pct_fr',
-    ]
+        self.all_cols = self.remainder_cols + self.one_hot_cols + self.num_cols
 
-    HIGH_CAT_COLS = [
-        'eng_yn',
-        'math_yn',
-        'read_yn',
-        'sci_yn'
-    ]
-
-    HIGH_NUM_COLS = [
-        'pct_remediation',
-        'graduation_rate'
-    ]
-
-    def __init__(self, index_cols=None, num_cols=None, remainder_cols=None, high_school=False, **kwargs):
-        # Set defaults if no information was provided
-        if index_cols is None:
-            self.index_cols = self.INDEX_COLS
-        else:
-            self.index_cols = index_cols
-
-        if num_cols is None:
-            if not high_school:
-                self.num_cols = self.NUM_COLS
-            else:
-                self.num_cols = self.NUM_COLS + self.HIGH_NUM_COLS
-        else:
-            self.num_cols = num_cols
-
-        if remainder_cols is None:
-            if not high_school:
-                self.remainder_cols = self.INDEX_COLS + self.CAT_COLS
-            else:
-                self.remainder_cols = self.INDEX_COLS + self.CAT_COLS + self.HIGH_CAT_COLS
-        else:
-            self.remainder_cols = index_cols + remainder_cols
-
-        self.all_cols = self.remainder_cols + self.num_cols
-
-        na_filler = FillBackForward()
-        feature_builder = KMeansFeatureBuilder(num_cols=self.num_cols, remainder_cols=self.remainder_cols)
+        # Transformers
+        imputer = Imputer()
+        self.feature_builder = KMeansFeatureBuilder(
+            remainder_cols=self.remainder_cols,
+            one_hot_cols=self.one_hot_cols,
+            num_cols=self.num_cols
+        )
         outlier_remover = OutlierRemover(index_cols=self.index_cols)
 
+        # Pipeline Steps
         steps = [
-            ('NA_filler', na_filler),
-            ('feature_builder', feature_builder),
+            ('imputer', imputer),
+            ('feature_builder', self.feature_builder),
             ('outlier_remover', outlier_remover)
         ]
 
+        # Pipeline
         self.pipeline = Pipeline(steps=steps)
 
     def fit(self, X, y=None):
@@ -90,20 +111,50 @@ class KMeansPreprocessor(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X = self.pipeline.transform(X)
-        return pd.DataFrame(X, columns=(self.remainder_cols + self.num_cols))
+        onehot_out = []
+        if self.one_hot_cols:
+            onehot_out = self.feature_builder.transformer.transformers_[1][1].get_feature_names_out().tolist()
+
+        return pd.DataFrame(X, columns=(self.remainder_cols + onehot_out + self.num_cols))
 
 
 class KMeansFeatureBuilder(BaseEstimator, TransformerMixin):
-    VERBOSE_FEATURE_NAMES_OUT = False
+    VERBOSE_FEATURE_NAMES_OUT = True
 
-    def __init__(self, num_cols=None, remainder_cols=None):
-        num = Pipeline(steps=[('encoder', Normalizer())])
+    def __init__(self, remainder_cols=None, one_hot_cols=None, num_cols=None, normalization=True, **kwargs):
+        # Set Params
+        self.remainder_cols = remainder_cols
+        self.one_hot_cols = one_hot_cols
+        self.num_cols = num_cols
+        self.normalization = normalization
+
+        # Transformers
         passthrough = Pipeline(steps=[('encoder', PassthroughTransformer())])
-        transformer = ColumnTransformer(transformers=[
-            ('', passthrough, remainder_cols),
-            ('num', num, num_cols)],
-            verbose_feature_names_out=self.VERBOSE_FEATURE_NAMES_OUT)
-        self.pipeline = Pipeline(steps=[('transformer', transformer)])
+        one_hot = Pipeline(steps=[('encoder', OneHotEncoder(drop='first', sparse_output=False))])
+        num = Pipeline(steps=[('encoder', Normalizer())])
+
+        if normalization:
+            transformers = [
+                ('', passthrough, remainder_cols),
+                ('onehot', one_hot, one_hot_cols),
+                ('num', num, num_cols)
+            ]
+        else:
+            transformers = [
+                ('', passthrough, remainder_cols),
+                ('onehot', one_hot, one_hot_cols),
+                ('num', passthrough, num_cols)
+            ]
+
+        if not one_hot_cols:
+            transformers.pop(1)
+
+        self.transformer = ColumnTransformer(
+            transformers=transformers,
+            verbose_feature_names_out=self.VERBOSE_FEATURE_NAMES_OUT
+        )
+
+        self.pipeline = Pipeline(steps=[('transformer', self.transformer)])
 
     def fit(self, X, y=None):
         self.pipeline.fit(X)
@@ -115,14 +166,15 @@ class KMeansFeatureBuilder(BaseEstimator, TransformerMixin):
 
 class PassthroughTransformer(BaseEstimator, TransformerMixin):
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None, **kwargs):
         return self
 
     def transform(self, X):
+        self.fit(X)
         return X
 
 
-class FillBackForward(BaseEstimator, TransformerMixin):
+class Imputer(BaseEstimator, TransformerMixin):
     id_cols = []
 
     def fit(self, X, y=None):
@@ -134,7 +186,7 @@ class FillBackForward(BaseEstimator, TransformerMixin):
         # Filling backwards and forwards
         X = self.fill_back_forward(X)
         # Fill remaining NA Values with median
-        X = self.fill_median_by_year(X)
+        X = self.fill_by_year(X)
 
         return X
 
@@ -150,8 +202,8 @@ class FillBackForward(BaseEstimator, TransformerMixin):
         return X
 
     @staticmethod
-    def fill_median_by_year(X):
-        """ Fills NA values with the median of each year."""
+    def fill_by_year(X):
+        """ Fills NA values with the median of each year for numeric and mode for non_numeric."""
         years = X['year'].unique()
         num_cols = X.select_dtypes(include=('float', 'int')).columns
         str_cols = X.select_dtypes(include=('object')).columns
@@ -170,6 +222,8 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
 
     def __init__(self, index_cols=None, **kwargs):
         # Automatically assume that there are two index columns if none are provided
+        self.index_cols = index_cols
+
         if index_cols is None:
             self.end_index_cols = 2
         else:
@@ -190,60 +244,29 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
 
 
 class LLMKMeansPreprocessor(BaseEstimator, TransformerMixin):
-    INDEX_COLS = ['unique_id', 'year']
 
-    COLS = [
-        'achievement_dir',
-        'growth_dir',
-        'overall_dir',
-        'school_grade',
-        'est_total_pop',
-        'child_pov_ratio',
-        'child_adult_ratio',
-        'instruction_per_pupil',
-        'support_per_pupil',
-        'community_per_pupil',
-        'other_per_pupil',
-        'pct_amind',
-        'pct_asian',
-        'pct_black',
-        'pct_hisp',
-        'pct_white',
-        'pct_2ormore',
-        'pct_fr'
-    ]
-
-    HIGH_COLS = [
-        'eng_yn',
-        'math_yn',
-        'read_yn',
-        'sci_yn',
-        'pct_remediation',
-        'graduation_rate'
-    ]
-
-    def __init__(self, index_cols=None, cols=None, high_school=False, **kwargs):
-        # Set defaults if no information was provided
-        if index_cols is None:
-            self.index_cols = self.INDEX_COLS
-        else:
-            self.index_cols = index_cols
-
-        if cols is None:
-            if not high_school:
-                cols = self.COLS
-            else:
-                cols = self.COLS + self.HIGH_COLS
-        else:
-            cols = cols
+    def __init__(self, high_school=False, **kwargs):
+        # Set params
+        self.high_school = high_school
+        self.index_cols = INDEX_COLS
+        self.remainder_cols = INDEX_COLS + ORD
+        self.one_hot_cols = ONE_HOT
+        self.num_cols = NUM_COLS
+        cols = ORD + ONE_HOT + NUM_COLS
+        # Adjust params if high_school
+        if high_school:
+            self.remainder_cols = self.remainder_cols + HIGH_ORD
+            self.one_hot_cols = HIGH_ONE_HOT
+            self.num_cols = self.num_cols + HIGH_NUM_COLS
+            cols = ORD + HIGH_ORD + HIGH_ONE_HOT + NUM_COLS + HIGH_NUM_COLS
 
         self.all_cols = self.index_cols + cols
 
-        na_filler = FillBackForward()
+        imputer = Imputer()
         feature_builder = LLMKMeansFeatureBuilder(index_cols=self.index_cols, cols=cols)
         outlier_remover = OutlierRemover(index_cols=self.index_cols)
 
-        steps = [('NA_filler', na_filler),
+        steps = [('imputer', imputer),
                  ('feature_builder', feature_builder),
                  ('outlier_remover', outlier_remover)]
 
@@ -264,12 +287,21 @@ class LLMKMeansFeatureBuilder(BaseEstimator, TransformerMixin):
     VERBOSE_FEATURE_NAMES_OUT = False
 
     def __init__(self, index_cols=None, cols=None, **kwargs):
+        # Set Params
+        self.index_cols = index_cols
+        self.cols = cols
+
+        # Transformers
         llm = Pipeline(steps=[('encoder', LLM(cols))])
         passthrough = Pipeline(steps=[('encoder', PassthroughTransformer())])
+
+        # Preprocessor
         transformer = ColumnTransformer(transformers=[
             ('', passthrough, index_cols),
             ('num', llm, cols)],
             verbose_feature_names_out=self.VERBOSE_FEATURE_NAMES_OUT)
+
+        # Pipeline
         self.pipeline = Pipeline(steps=[('transformer', transformer)])
 
     def fit(self, X, y=None):
@@ -306,4 +338,4 @@ class LLM(BaseEstimator, TransformerMixin):
     @staticmethod
     def compile_text(X, cols):
         """ Does a sentence embedding of all the features """
-        return ',\n'.join([f'{col}: {X[col]}' for col in cols])
+        return '\n'.join([f'{col}: {X[col]}' for col in cols])

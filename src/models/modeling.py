@@ -1,6 +1,7 @@
 from gower import gower_matrix
 from kmodes.kprototypes import KPrototypes
 import lightgbm as lgb
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,18 +10,42 @@ import plotly.offline as pyo
 import prince
 import seaborn as sns
 import shap
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_samples, silhouette_score, calinski_harabasz_score, davies_bouldin_score, adjusted_rand_score
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import Normalizer
 from yellowbrick.cluster import KElbowVisualizer
 
-from src.features.preprocessors import KMeansPreprocessor
+import src.features.preprocessors as preprocessors
 from src.input_output_functions import append_path
 
 sns.set_theme(style='darkgrid', palette='husl')
 pyo.init_notebook_mode()
 
 RANDOM_STATE = 42
+
+
+class DBSCANSelector:
+    """ Class that has a collection of methods that help describe the model for different values of eps """
+
+    def __init__(self, df):
+        # The features
+        self.X = df.drop(['unique_id', 'year'], axis=1)
+        # the index part of the dataframe
+        self.index = df[['unique_id', 'year']]
+
+    def show_elbow(self):
+        n = 2 * self.X.shape[1] - 1
+
+        neighbors = NearestNeighbors(n_neighbors=n, radius=1).fit(self.X)
+        distances, indices = neighbors.kneighbors(self.X)
+        distances = np.sort(distances, axis=0)[:, n-1]
+
+        plt.figure(dpi=100)
+        sns.lineplot(distances)
+        plt.xlabel('Points in Dataset')
+        plt.ylabel('epsilon')
+        plt.show()
 
 
 class KMeansSelector:
@@ -37,9 +62,9 @@ class KMeansSelector:
     @staticmethod
     def create_model(n_clusters=8):
         """ Returns a KMeans model """
-        return KMeans(n_clusters=n_clusters, init='k-means++', random_state=RANDOM_STATE, n_init='auto')
+        return KMeans(n_clusters=n_clusters, init='k-means++', random_state=RANDOM_STATE, n_init='auto', max_iter=1000)
 
-    def show_elbow(self):
+    def show_elbow(self, save_filename=None):
         """ Utilizes the KElbowVisualizer from yellowbrick to create an elbow plot
         of distortion scores and model fit time across a range of k values and identifies
          the optimal k"""
@@ -49,7 +74,7 @@ class KMeansSelector:
         visualizer = KElbowVisualizer(model, k=(self.K_MIN, self.K_MAX))
 
         visualizer.fit(self.X)
-        visualizer.show()
+        visualizer.show(outpath=save_filename)
 
     def show_silhouettes(self, k_min=None, k_max=None):
         """ Shows silhouette plots across a range from k_min to k_max """
@@ -61,8 +86,10 @@ class KMeansSelector:
         if k_min < 2 or k_min > k_max:
             raise ValueError('k_min must be greater than 1 and less than k_max')
 
+        n_cols = 2
+        n_rows = math.ceil(float(k_max - k_min) / 2)
+
         for k in range(k_min, k_max):
-            print(f'{k=}')
             self.make_silhouette_plot(k)
 
     def get_silhouette_scores(self, n_clusters):
@@ -122,30 +149,23 @@ class KMeansSelector:
 
 class KPrototypesModelSelector(KMeansSelector):
     def __init__(self, df, high_school=False):
-        if high_school:
-            cat_cols = KMeansPreprocessor.CAT_COLS + KMeansPreprocessor.HIGH_CAT_COLS
-        else:
-            cat_cols = KMeansPreprocessor.CAT_COLS
-
-        # The features
-        self.X = df.drop(['unique_id', 'year'], axis=1)
-        # the index part of the dataframe
-        self.index = df[['unique_id', 'year']]
-        # The location of the categorical columns
-        self.cat_indices = [self.X.columns.get_loc(col) for col in cat_cols]
+        kpromodel = KPrototypesModel(df, 2, high_school=high_school)
+        self.X = kpromodel.X
+        self.index = kpromodel.index
+        self.cat_indices = kpromodel.cat_indices
 
     @staticmethod
     def create_model(n_clusters=8):
         """ Returns a KMeans model """
         return KPrototypes(n_clusters=n_clusters, random_state=RANDOM_STATE)
 
-    def show_elbow(self):
+    def show_elbow(self, save_filename=None):
         """ Utilizes the KElbowVisualizer from yellowbrick to create an elbow plot
         of distortion scores and model fit time across a range of k values and identifies
          the optimal k"""
         # Ensure that school_id and year are not found in the dataframe
-        costs = np.zeros(8-2)
-        ks = np.arange(2, 8)
+        costs = np.zeros(self.K_MAX-self.K_MIN)
+        ks = np.arange(self.K_MIN, self.K_MAX)
         for i in range(len(ks)):
             model = self.create_model(ks[i])
             model.fit_predict(self.X, categorical=self.cat_indices)
@@ -155,6 +175,8 @@ class KPrototypesModelSelector(KMeansSelector):
         plt.title('KPrototypes Elbow')
         plt.xlabel('K')
         plt.ylabel('Cost')
+        if save_filename is not None:
+            plt.savefig(save_filename)
         plt.show()
 
     def get_silhouette_scores(self, n_clusters):
@@ -175,7 +197,7 @@ class KPrototypesModelSelector(KMeansSelector):
 class KMeansModel:
     """ Class that will create KMeans model and provide evaluations of that model. """
 
-    def __init__(self, df, n_clusters):
+    def __init__(self, df, n_clusters=4):
         # The index columns
         self.index = df[['unique_id', 'year']]
         # The feature columns
@@ -209,7 +231,7 @@ class KMeansModel:
               f'Calinksi Score: {cs}',
               f'Silhouette Score: {ss}', sep='\n')
 
-    def show_feature_importance(self, data_no_outliers=None):
+    def show_feature_importance(self, data_no_outliers=None, save_filename=None):
         """ Uses a gradient boosting decision tree from LightGBM to classify labels,
         and then shows the feature importance using the shap Tree explainer """
         # If not no outlier dataset is provided, the data used for the clustering model will be used
@@ -227,6 +249,8 @@ class KMeansModel:
         # Display the Explainer
         shap.summary_plot(shap_vals, data_no_outliers, plot_type='bar', plot_size=(15, 10), show=False)
         plt.title('SHAP Summary Plot of LGBM Cluster Classification')
+        if save_filename is not None:
+            plt.savefig(save_filename)
         plt.show()
 
     def _get_pca(self, n_dim):
@@ -317,24 +341,42 @@ class KPrototypesModel(KMeansModel):
     def __init__(self, df, n_clusters, high_school=False, **kwargs):
         super().__init__(df, n_clusters)
 
+        self.num_cols = preprocessors.NUM_COLS
         if high_school:
-            self.cat_cols = KMeansPreprocessor.CAT_COLS + KMeansPreprocessor.HIGH_CAT_COLS
-            self.num_cols = KMeansPreprocessor.NUM_COLS + KMeansPreprocessor.HIGH_NUM_COLS
-        else:
-            self.cat_cols = KMeansPreprocessor.CAT_COLS
-            self.num_cols = KMeansPreprocessor.NUM_COLS
+            self.num_cols = self.num_cols + preprocessors.HIGH_NUM_COLS
 
+        # The features
+        self.X = df.drop(['unique_id', 'year'], axis=1)
+        # the index part of the dataframe
+        self.index = df[['unique_id', 'year']]
+        # The location of the categorical columns
+        non_cat_indices = {self.X.columns.get_loc(col) for col in self.num_cols}
+        self.cat_indices = list(set(np.arange(len(self.X.columns))).difference(non_cat_indices))
+        # Normalize numeric columns
         self.transform_df()
+
         self.model = KPrototypes(n_clusters=n_clusters, random_state=RANDOM_STATE)
 
     def fit_predict(self):
-        cat_indices = [self.X.columns.get_loc(col) for col in self.cat_cols]
-        self.labels = self.model.fit_predict(self.X, categorical=cat_indices)
+        self.labels = self.model.fit_predict(self.X, categorical=self.cat_indices)
 
     def transform_df(self):
         # Normalize the numeric columns
         normalizer = Normalizer()
         self.X[self.num_cols] = normalizer.fit_transform(self.X[self.num_cols])
+
+
+class DBSCANModel(KMeansModel):
+
+    def __init__(self, df, eps, min_samples, **kwargs):
+        # The index columns
+        self.index = df[['unique_id', 'year']]
+        # The feature columns
+        self.X = df.drop(['unique_id', 'year'], axis=1)
+        # The model that will be used
+        self.model = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1)
+        # Initialize the labels assigned
+        self.labels = []
 
 
 def show_adj_rand_score_mat(models, model_names):
@@ -350,3 +392,5 @@ def show_adj_rand_score_mat(models, model_names):
             mat[i, j] = adjusted_rand_score(models[i].labels, models[j].labels)
 
     return pd.DataFrame(mat, columns=model_names, index=model_names)
+
+
